@@ -29,7 +29,7 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { re
 // captureClient builds a Client with a transport that records the last request into
 // the returned pointer slot and replies with the canned response.
 func captureClient(status int, headers http.Header, body string, slot **http.Request) *Client {
-	c := New()
+	c := New("test-key")
 	c.http.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
 		*slot = req
 		return &http.Response{
@@ -44,7 +44,7 @@ func captureClient(status int, headers http.Header, body string, slot **http.Req
 // failClient builds a Client whose transport returns an error, simulating a network
 // failure. It also records whether RoundTrip was ever invoked.
 func failClient(called *bool) *Client {
-	c := New()
+	c := New("test-key")
 	c.http.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
 		*called = true
 		return nil, errors.New("dial tcp: connection refused")
@@ -471,7 +471,7 @@ var errSentinel = errors.New("dial tcp: connection refused")
 // error: errors.Is reaches the wrapped cause and errors.As still finds both the
 // concrete *TransportError and the embedded *DemografixError.
 func TestTransportErrorWrapsCause(t *testing.T) {
-	c := New()
+	c := New("test-key")
 	c.http.Transport = roundTripFunc(func(*http.Request) (*http.Response, error) {
 		return nil, errSentinel
 	})
@@ -493,22 +493,22 @@ func TestTransportErrorWrapsCause(t *testing.T) {
 	}
 }
 
-// --- apikey is added only when set ---
+// --- apikey is always sent (every client carries a key) ---
 
-func TestAPIKeyOmittedWhenAbsent(t *testing.T) {
+func TestAPIKeyAlwaysSent(t *testing.T) {
 	var req *http.Request
 	c := captureClient(http.StatusOK, fixtureHeaders(), genderizeSingle, &req)
 	if _, err := c.Genderize(context.Background(), "peter"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := req.URL.Query()["apikey"]; ok {
-		t.Error("apikey must be omitted when no key is set")
+	if got := req.URL.Query().Get("apikey"); got != "test-key" {
+		t.Errorf("apikey = %q, want test-key (always present on the request)", got)
 	}
 }
 
 func TestAPIKeySentWhenSet(t *testing.T) {
 	var req *http.Request
-	c := New(WithAPIKey("secret"))
+	c := New("secret")
 	c.http.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		req = r
 		return &http.Response{
@@ -522,6 +522,45 @@ func TestAPIKeySentWhenSet(t *testing.T) {
 	}
 	if got := req.URL.Query().Get("apikey"); got != "secret" {
 		t.Errorf("apikey = %q, want secret", got)
+	}
+}
+
+// --- Assertion 7: constructing without a usable api_key fails client-side, no HTTP ---
+
+func TestMissingAPIKeyNoHTTP(t *testing.T) {
+	// An empty key and a blank (whitespace-only) key both fail before any request.
+	for _, key := range []string{"", "   "} {
+		called := false
+		c := New(key)
+		c.http.Transport = roundTripFunc(func(*http.Request) (*http.Response, error) {
+			called = true
+			return nil, errors.New("transport must not be reached")
+		})
+
+		_, err := c.Genderize(context.Background(), "peter")
+		if err == nil {
+			t.Fatalf("key %q: expected a ValidationError, got nil", key)
+		}
+		var ve *ValidationError
+		if !errors.As(err, &ve) {
+			t.Fatalf("key %q: error type = %T, want *ValidationError", key, err)
+		}
+		if called {
+			t.Errorf("key %q: a missing api_key must not send an HTTP request", key)
+		}
+
+		// The same guard fires on agify and nationalize, again with no HTTP call.
+		called = false
+		if _, err := c.Agify(context.Background(), "peter"); !errors.As(err, &ve) {
+			t.Errorf("key %q: agify error = %T, want *ValidationError", key, err)
+		}
+		called = false
+		if _, err := c.Nationalize(context.Background(), "peter"); !errors.As(err, &ve) {
+			t.Errorf("key %q: nationalize error = %T, want *ValidationError", key, err)
+		}
+		if called {
+			t.Errorf("key %q: a missing api_key must not send an HTTP request", key)
+		}
 	}
 }
 

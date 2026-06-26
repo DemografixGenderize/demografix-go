@@ -15,9 +15,10 @@ import (
 )
 
 func main() {
-	// api_key is optional. Without it, requests run on the free per-IP tier.
+	// An API key is required. Generate one in your dashboard at genderize.io,
+	// agify.io, or nationalize.io.
 	client := demografix.New(
-		demografix.WithAPIKey(os.Getenv("DEMOGRAFIX_API_KEY")),
+		os.Getenv("DEMOGRAFIX_API_KEY"),
 		demografix.WithTimeout(10*time.Second),
 	)
 

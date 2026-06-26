@@ -1,6 +1,6 @@
 # demografix-go
 
-Go client for the Demografix APIs: genderize.io (gender), agify.io (age), and nationalize.io (nationality). One client covers all three services through the same shape and reports the remaining quota carried on every response.
+Run demographic analysis over names — predicted gender, age, and nationality — from one Go client. The package covers genderize.io, agify.io, and nationalize.io.
 
 ## Install
 
@@ -25,7 +25,7 @@ import (
 )
 
 func main() {
-	client := demografix.New(demografix.WithAPIKey("YOUR_API_KEY"))
+	client := demografix.New("YOUR_API_KEY")
 
 	names := []string{"peter", "lois", "michael", "matthew"}
 
@@ -44,7 +44,7 @@ func main() {
 }
 ```
 
-`WithAPIKey` is optional. Without a key, requests run unauthenticated against a per-IP quota. The base URLs and the User-Agent are hardcoded constants, not options. Quota is read from a returned value or a raised error, never cached on the client.
+`New` takes the API key as its first argument. The base URLs and the User-Agent are hardcoded constants, not options. Quota is read from a returned value or a raised error, never cached on the client.
 
 ## genderize
 
@@ -177,4 +177,4 @@ if err != nil {
 
 ## API keys
 
-Create a key in your account dashboard at genderize.io, agify.io, or nationalize.io. One key works across all three services and shares one quota. Full reference: https://genderize.io/documentation/api
+An API key is required. Creating one is free and includes 2,500 requests per month. Generate a key in your dashboard at genderize.io, agify.io, or nationalize.io. One key works across all three services. Full reference: https://genderize.io/documentation/api

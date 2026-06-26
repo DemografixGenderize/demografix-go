@@ -43,21 +43,19 @@ type Client struct {
 // Option configures a Client in New.
 type Option func(*Client)
 
-// WithAPIKey sets the API key sent as the apikey query parameter on every request.
-// Without a key, requests go out on the free per-IP tier.
-func WithAPIKey(apiKey string) Option {
-	return func(c *Client) { c.apiKey = apiKey }
-}
-
 // WithTimeout sets the per-request timeout. The default is ten seconds.
 func WithTimeout(timeout time.Duration) Option {
 	return func(c *Client) { c.http.Timeout = timeout }
 }
 
-// New builds a Client. Pass WithAPIKey and WithTimeout to configure it.
-func New(opts ...Option) *Client {
+// New builds a Client for the given API key. The key is required and is sent as the
+// apikey query parameter on every request; an empty or blank key makes every request
+// fail with a ValidationError before any HTTP call. Pass WithTimeout to override the
+// default ten-second timeout. The same key works across all three services.
+func New(apiKey string, opts ...Option) *Client {
 	c := &Client{
-		http: &http.Client{Timeout: defaultTimeout},
+		apiKey: apiKey,
+		http:   &http.Client{Timeout: defaultTimeout},
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -176,8 +174,13 @@ func checkBatch(names []string) error {
 
 // do builds and sends one request, parses the quota headers, and decodes the body
 // into out. When names holds one element the query uses name=v; otherwise it uses
-// repeated name[]=v. The country_id and apikey parameters are added only when set.
+// repeated name[]=v. apikey is always sent; country_id is added only when set. An
+// empty or blank api key fails client-side, before any HTTP call.
 func (c *Client) do(ctx context.Context, baseURL string, names []string, countryID string, out any) (Quota, error) {
+	if strings.TrimSpace(c.apiKey) == "" {
+		return Quota{}, newValidationError("api_key is required")
+	}
+
 	req, err := c.buildRequest(ctx, baseURL, names, countryID)
 	if err != nil {
 		return Quota{}, wrapTransportError(err.Error(), err)
@@ -224,9 +227,7 @@ func (c *Client) buildRequest(ctx context.Context, baseURL string, names []strin
 	if countryID != "" {
 		q.Set("country_id", countryID)
 	}
-	if c.apiKey != "" {
-		q.Set("apikey", c.apiKey)
-	}
+	q.Set("apikey", c.apiKey)
 	u.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)

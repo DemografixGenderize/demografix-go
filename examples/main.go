@@ -1,6 +1,5 @@
 // Command example reads a list of names and reports the aggregate demographic mix:
-// a gender split, an age distribution, and a nationality breakdown. It never labels
-// an individual.
+// a gender split, an age distribution, and a nationality breakdown.
 package main
 
 import (

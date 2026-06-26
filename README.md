@@ -12,7 +12,7 @@ Requires Go 1.21 or later. The package has no third-party dependencies.
 
 ## Quickstart
 
-Construct a client, run a batch over a list of names, read the predictions, and read the remaining quota. The deliverable is a gender split of the list, not a label for any one name.
+Construct a client, run a batch over a list of names, read the predictions, and read the remaining quota.
 
 ```go
 package main

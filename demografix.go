@@ -18,7 +18,7 @@ import (
 
 const (
 	// Version is the SDK version, sent in the User-Agent on every request.
-	Version = "0.1.0"
+	Version = "0.1.1"
 
 	userAgent = "demografix-go/" + Version
 
@@ -89,7 +89,7 @@ func newRequestConfig(opts []RequestOption) requestConfig {
 func (c *Client) Genderize(ctx context.Context, name string, opts ...RequestOption) (GenderizeResult, error) {
 	rc := newRequestConfig(opts)
 	var pred GenderizePrediction
-	quota, err := c.do(ctx, genderizeBaseURL, []string{name}, rc.countryID, &pred)
+	quota, err := c.do(ctx, genderizeBaseURL, []string{name}, rc.countryID, false, &pred)
 	if err != nil {
 		return GenderizeResult{}, err
 	}
@@ -105,7 +105,7 @@ func (c *Client) GenderizeBatch(ctx context.Context, names []string, opts ...Req
 	}
 	rc := newRequestConfig(opts)
 	var preds []GenderizePrediction
-	quota, err := c.do(ctx, genderizeBaseURL, names, rc.countryID, &preds)
+	quota, err := c.do(ctx, genderizeBaseURL, names, rc.countryID, true, &preds)
 	if err != nil {
 		return GenderizeBatchResult{}, err
 	}
@@ -116,7 +116,7 @@ func (c *Client) GenderizeBatch(ctx context.Context, names []string, opts ...Req
 func (c *Client) Agify(ctx context.Context, name string, opts ...RequestOption) (AgifyResult, error) {
 	rc := newRequestConfig(opts)
 	var pred AgifyPrediction
-	quota, err := c.do(ctx, agifyBaseURL, []string{name}, rc.countryID, &pred)
+	quota, err := c.do(ctx, agifyBaseURL, []string{name}, rc.countryID, false, &pred)
 	if err != nil {
 		return AgifyResult{}, err
 	}
@@ -132,7 +132,7 @@ func (c *Client) AgifyBatch(ctx context.Context, names []string, opts ...Request
 	}
 	rc := newRequestConfig(opts)
 	var preds []AgifyPrediction
-	quota, err := c.do(ctx, agifyBaseURL, names, rc.countryID, &preds)
+	quota, err := c.do(ctx, agifyBaseURL, names, rc.countryID, true, &preds)
 	if err != nil {
 		return AgifyBatchResult{}, err
 	}
@@ -142,7 +142,7 @@ func (c *Client) AgifyBatch(ctx context.Context, names []string, opts ...Request
 // Nationalize predicts the nationality for one name.
 func (c *Client) Nationalize(ctx context.Context, name string) (NationalizeResult, error) {
 	var pred NationalizePrediction
-	quota, err := c.do(ctx, nationalizeBaseURL, []string{name}, "", &pred)
+	quota, err := c.do(ctx, nationalizeBaseURL, []string{name}, "", false, &pred)
 	if err != nil {
 		return NationalizeResult{}, err
 	}
@@ -157,7 +157,7 @@ func (c *Client) NationalizeBatch(ctx context.Context, names []string) (National
 		return NationalizeBatchResult{}, err
 	}
 	var preds []NationalizePrediction
-	quota, err := c.do(ctx, nationalizeBaseURL, names, "", &preds)
+	quota, err := c.do(ctx, nationalizeBaseURL, names, "", true, &preds)
 	if err != nil {
 		return NationalizeBatchResult{}, err
 	}
@@ -173,15 +173,15 @@ func checkBatch(names []string) error {
 }
 
 // do builds and sends one request, parses the quota headers, and decodes the body
-// into out. When names holds one element the query uses name=v; otherwise it uses
-// repeated name[]=v. apikey is always sent; country_id is added only when set. An
-// empty or blank api key fails client-side, before any HTTP call.
-func (c *Client) do(ctx context.Context, baseURL string, names []string, countryID string, out any) (Quota, error) {
+// into out. A single call uses name=v; a batch call uses repeated name[]=v. apikey
+// is always sent; country_id is added only when set. An empty or blank api key
+// fails client-side, before any HTTP call.
+func (c *Client) do(ctx context.Context, baseURL string, names []string, countryID string, batch bool, out any) (Quota, error) {
 	if strings.TrimSpace(c.apiKey) == "" {
 		return Quota{}, newValidationError("api_key is required")
 	}
 
-	req, err := c.buildRequest(ctx, baseURL, names, countryID)
+	req, err := c.buildRequest(ctx, baseURL, names, countryID, batch)
 	if err != nil {
 		return Quota{}, wrapTransportError(err.Error(), err)
 	}
@@ -210,19 +210,21 @@ func (c *Client) do(ctx context.Context, baseURL string, names []string, country
 }
 
 // buildRequest assembles the GET request with the query string and headers.
-func (c *Client) buildRequest(ctx context.Context, baseURL string, names []string, countryID string) (*http.Request, error) {
+func (c *Client) buildRequest(ctx context.Context, baseURL string, names []string, countryID string, batch bool) (*http.Request, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, err
 	}
 
 	q := url.Values{}
-	if len(names) == 1 {
-		q.Set("name", names[0])
-	} else {
+	if batch {
+		// Always name[], even for one name: the API keys its response shape on
+		// the parameter form, and a batch call must decode an array.
 		for _, n := range names {
 			q.Add("name[]", n)
 		}
+	} else {
+		q.Set("name", names[0])
 	}
 	if countryID != "" {
 		q.Set("country_id", countryID)

@@ -103,8 +103,8 @@ func TestGenderizeSingle(t *testing.T) {
 	if _, ok := q["name[]"]; ok {
 		t.Error("single request must not use name[]")
 	}
-	if got := req.Header.Get("User-Agent"); got != "demografix-go/0.1.0" {
-		t.Errorf("User-Agent = %q, want demografix-go/0.1.0", got)
+	if got := req.Header.Get("User-Agent"); got != "demografix-go/0.1.1" {
+		t.Errorf("User-Agent = %q, want demografix-go/0.1.1", got)
 	}
 	if req.URL.Host != "api.genderize.io" {
 		t.Errorf("host = %q, want api.genderize.io", req.URL.Host)
@@ -207,6 +207,68 @@ func TestGenderizeBatchOrder(t *testing.T) {
 	}
 	if res.Results[1].Gender != "female" {
 		t.Errorf("results[1].gender = %q, want female", res.Results[1].Gender)
+	}
+}
+
+// --- Assertion 8: a one-name batch still sends name[] and parses a one-element array ---
+
+func TestGenderizeBatchSingleName(t *testing.T) {
+	var req *http.Request
+	c := captureClient(http.StatusOK, fixtureHeaders(), `[ `+genderizeSingle+` ]`, &req)
+
+	res, err := c.GenderizeBatch(context.Background(), []string{"peter"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res.Results) != 1 || res.Results[0].Gender != "male" {
+		t.Fatalf("results = %+v, want one male prediction", res.Results)
+	}
+	names := req.URL.Query()["name[]"]
+	if len(names) != 1 || names[0] != "peter" {
+		t.Errorf("name[] = %v, want [peter]", names)
+	}
+	if req.URL.Query().Get("name") != "" {
+		t.Error("one-name batch must not use name=")
+	}
+}
+
+func TestAgifyBatchSingleName(t *testing.T) {
+	var req *http.Request
+	c := captureClient(http.StatusOK, fixtureHeaders(), `[ { "count": 311558, "name": "michael", "age": 57 } ]`, &req)
+
+	res, err := c.AgifyBatch(context.Background(), []string{"michael"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res.Results) != 1 || res.Results[0].Age == nil || *res.Results[0].Age != 57 {
+		t.Fatalf("results = %+v, want one age-57 prediction", res.Results)
+	}
+	names := req.URL.Query()["name[]"]
+	if len(names) != 1 || names[0] != "michael" {
+		t.Errorf("name[] = %v, want [michael]", names)
+	}
+	if req.URL.Query().Get("name") != "" {
+		t.Error("one-name batch must not use name=")
+	}
+}
+
+func TestNationalizeBatchSingleName(t *testing.T) {
+	var req *http.Request
+	c := captureClient(http.StatusOK, fixtureHeaders(), `[ `+nationalizeSingle+` ]`, &req)
+
+	res, err := c.NationalizeBatch(context.Background(), []string{"nguyen"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res.Results) != 1 || len(res.Results[0].Country) == 0 || res.Results[0].Country[0].CountryID != "VN" {
+		t.Fatalf("results = %+v, want one VN prediction", res.Results)
+	}
+	names := req.URL.Query()["name[]"]
+	if len(names) != 1 || names[0] != "nguyen" {
+		t.Errorf("name[] = %v, want [nguyen]", names)
+	}
+	if req.URL.Query().Get("name") != "" {
+		t.Error("one-name batch must not use name=")
 	}
 }
 

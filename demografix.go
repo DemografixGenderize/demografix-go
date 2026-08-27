@@ -1,4 +1,4 @@
-// Package demografix predicts gender, age, and nationality from first names.
+// Package demografix predicts gender, age, and nationality from names.
 //
 // It is the official Go client for the Demografix APIs: genderize.io (gender),
 // agify.io (age), and nationalize.io (nationality). One client covers all three

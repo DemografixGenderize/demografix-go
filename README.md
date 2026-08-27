@@ -1,6 +1,6 @@
 # demografix-go
 
-Predict gender, age, and nationality from first names. One Go client covers all three Demografix
+Predict gender, age, and nationality from names. One Go client covers all three Demografix
 APIs — [genderize.io](https://genderize.io) (gender), [agify.io](https://agify.io) (age), and
 [nationalize.io](https://nationalize.io) (nationality) — with single-name lookups and batches of up
 to 100 names per request.
@@ -57,7 +57,7 @@ client.
 
 ## genderize
 
-Single name and batch. Both return prediction fields plus a quota.
+Predict gender from names. Single name and batch both return prediction fields plus a quota.
 
 ```go
 g, err := client.Genderize(ctx, "peter")
@@ -73,6 +73,8 @@ for _, p := range batch.Results {
 `Gender` is the empty string when the API returns null. That is a successful response, not an error.
 
 ## agify
+
+Predict age from names.
 
 ```go
 a, err := client.Agify(ctx, "michael")
@@ -90,6 +92,8 @@ for _, p := range batch.Results {
 `Age` is a `*int` and is nil when the API returns null.
 
 ## nationalize
+
+Predict nationality from names.
 
 ```go
 n, err := client.Nationalize(ctx, "nguyen")

@@ -1,7 +1,10 @@
-// Package demografix is the official Go client for the Demografix APIs:
-// genderize.io (gender), agify.io (age), and nationalize.io (nationality). One
-// client covers all three services through the same shape and reports the
-// remaining quota carried on every response.
+// Package demografix predicts gender, age, and nationality from first names.
+//
+// It is the official Go client for the Demografix APIs: genderize.io (gender),
+// agify.io (age), and nationalize.io (nationality). One client covers all three
+// services through the same shape. Single-name and batch methods share that
+// shape, a batch carries up to 100 names in one request for bulk lookups, and
+// every result reports the remaining quota carried on the response.
 package demografix
 
 import (
@@ -18,7 +21,7 @@ import (
 
 const (
 	// Version is the SDK version, sent in the User-Agent on every request.
-	Version = "0.1.1"
+	Version = "0.2.0"
 
 	userAgent = "demografix-go/" + Version
 
@@ -29,7 +32,7 @@ const (
 	defaultTimeout = 10 * time.Second
 
 	// maxBatch is the largest number of names allowed in a single request.
-	maxBatch = 10
+	maxBatch = 100
 )
 
 // Client calls the three Demografix services. Construct one with New and reuse it;
@@ -96,8 +99,8 @@ func (c *Client) Genderize(ctx context.Context, name string, opts ...RequestOpti
 	return GenderizeResult{GenderizePrediction: pred, Quota: quota}, nil
 }
 
-// GenderizeBatch predicts the gender for up to ten names. Results are returned in
-// input order. A batch of more than ten names raises a ValidationError before any
+// GenderizeBatch predicts the gender for up to 100 names. Results are returned in
+// input order. A batch of more than 100 names raises a ValidationError before any
 // HTTP call.
 func (c *Client) GenderizeBatch(ctx context.Context, names []string, opts ...RequestOption) (GenderizeBatchResult, error) {
 	if err := checkBatch(names); err != nil {
@@ -123,8 +126,8 @@ func (c *Client) Agify(ctx context.Context, name string, opts ...RequestOption) 
 	return AgifyResult{AgifyPrediction: pred, Quota: quota}, nil
 }
 
-// AgifyBatch predicts the age for up to ten names. Results are returned in input
-// order. A batch of more than ten names raises a ValidationError before any HTTP
+// AgifyBatch predicts the age for up to 100 names. Results are returned in input
+// order. A batch of more than 100 names raises a ValidationError before any HTTP
 // call.
 func (c *Client) AgifyBatch(ctx context.Context, names []string, opts ...RequestOption) (AgifyBatchResult, error) {
 	if err := checkBatch(names); err != nil {
@@ -149,8 +152,8 @@ func (c *Client) Nationalize(ctx context.Context, name string) (NationalizeResul
 	return NationalizeResult{NationalizePrediction: pred, Quota: quota}, nil
 }
 
-// NationalizeBatch predicts the nationality for up to ten names. Results are
-// returned in input order. A batch of more than ten names raises a
+// NationalizeBatch predicts the nationality for up to 100 names. Results are
+// returned in input order. A batch of more than 100 names raises a
 // ValidationError before any HTTP call.
 func (c *Client) NationalizeBatch(ctx context.Context, names []string) (NationalizeBatchResult, error) {
 	if err := checkBatch(names); err != nil {
@@ -164,10 +167,10 @@ func (c *Client) NationalizeBatch(ctx context.Context, names []string) (National
 	return NationalizeBatchResult{Results: preds, Quota: quota}, nil
 }
 
-// checkBatch enforces the ten-name limit client-side.
+// checkBatch enforces the 100-name limit client-side.
 func checkBatch(names []string) error {
 	if len(names) > maxBatch {
-		return newValidationError("batch holds more than 10 names")
+		return newValidationError("batch holds more than " + strconv.Itoa(maxBatch) + " names")
 	}
 	return nil
 }

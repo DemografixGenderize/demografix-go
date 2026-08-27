@@ -38,7 +38,7 @@ type SubscriptionError struct{ DemografixError }
 func (e *SubscriptionError) Unwrap() error { return &e.DemografixError }
 
 // ValidationError reports a rejected request (HTTP 422). It is also raised
-// client-side, before any HTTP call, when a batch holds more than ten names.
+// client-side, before any HTTP call, when a batch holds more than 100 names.
 type ValidationError struct{ DemografixError }
 
 // Unwrap exposes the embedded base, so errors.As matches *DemografixError too.

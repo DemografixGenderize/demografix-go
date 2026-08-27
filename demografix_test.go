@@ -103,8 +103,8 @@ func TestGenderizeSingle(t *testing.T) {
 	if _, ok := q["name[]"]; ok {
 		t.Error("single request must not use name[]")
 	}
-	if got := req.Header.Get("User-Agent"); got != "demografix-go/0.1.1" {
-		t.Errorf("User-Agent = %q, want demografix-go/0.1.1", got)
+	if got := req.Header.Get("User-Agent"); got != "demografix-go/0.2.0" {
+		t.Errorf("User-Agent = %q, want demografix-go/0.2.0", got)
 	}
 	if req.URL.Host != "api.genderize.io" {
 		t.Errorf("host = %q, want api.genderize.io", req.URL.Host)
@@ -363,13 +363,13 @@ func TestAgifyBatchCountryRoundTrip(t *testing.T) {
 	}
 }
 
-// --- Assertion 5: batch of 11 names raises ValidationError with NO HTTP call ---
+// --- Assertion 5: batch of 101 names raises ValidationError with NO HTTP call ---
 
 func TestBatchTooLargeNoHTTP(t *testing.T) {
 	called := false
 	c := failClient(&called)
 
-	names := make([]string, 11)
+	names := make([]string, 101)
 	for i := range names {
 		names[i] = "n"
 	}
@@ -403,19 +403,19 @@ func TestBatchTooLargeNoHTTP(t *testing.T) {
 	}
 }
 
-func TestBatchExactlyTenAllowed(t *testing.T) {
+func TestBatchExactlyMaxAllowed(t *testing.T) {
 	var req *http.Request
 	c := captureClient(http.StatusOK, fixtureHeaders(), `[]`, &req)
 
-	names := make([]string, 10)
+	names := make([]string, 100)
 	for i := range names {
 		names[i] = "n"
 	}
 	if _, err := c.GenderizeBatch(context.Background(), names); err != nil {
-		t.Fatalf("batch of 10 must be allowed: %v", err)
+		t.Fatalf("batch of 100 must be allowed: %v", err)
 	}
 	if req == nil {
-		t.Fatal("a batch of 10 must send an HTTP request")
+		t.Fatal("a batch of 100 must send an HTTP request")
 	}
 }
 

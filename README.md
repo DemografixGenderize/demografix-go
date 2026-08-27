@@ -1,6 +1,13 @@
 # demografix-go
 
-Run demographic analysis over names — predicted gender, age, and nationality — from one Go client. The package covers genderize.io, agify.io, and nationalize.io.
+Predict gender, age, and nationality from first names. One Go client covers all three Demografix
+APIs — [genderize.io](https://genderize.io) (gender), [agify.io](https://agify.io) (age), and
+[nationalize.io](https://nationalize.io) (nationality) — with single-name lookups and batches of up
+to 100 names per request.
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/DemografixGenderize/demografix-go.svg)](https://pkg.go.dev/github.com/DemografixGenderize/demografix-go)
+[![CI](https://github.com/DemografixGenderize/demografix-go/actions/workflows/ci.yml/badge.svg)](https://github.com/DemografixGenderize/demografix-go/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 ## Install
 
@@ -44,7 +51,9 @@ func main() {
 }
 ```
 
-`New` takes the API key as its first argument. The base URLs and the User-Agent are hardcoded constants, not options. Quota is read from a returned value or a raised error, never cached on the client.
+`New` takes the API key as its first argument. The base URLs and the User-Agent are hardcoded
+constants, not options. Quota is read from a returned value or a raised error, never cached on the
+client.
 
 ## genderize
 
@@ -61,7 +70,7 @@ for _, p := range batch.Results {
 }
 ```
 
-`Gender` is the empty string when the API returns null. The batch maximum is ten names; a larger batch raises a `ValidationError` before any HTTP call.
+`Gender` is the empty string when the API returns null. That is a successful response, not an error.
 
 ## agify
 
@@ -97,15 +106,44 @@ for _, p := range batch.Results {
 
 `Country` is empty on no match. The nationalize methods do not accept a country option.
 
+## Batch limit
+
+Each batch accepts at most 100 names. A larger batch returns a `ValidationError` before any HTTP
+call. Chunk a longer list and aggregate across the chunks.
+
+```go
+split := map[string]int{}
+for start := 0; start < len(roster); start += 100 {
+	end := min(start+100, len(roster))
+
+	batch, err := client.GenderizeBatch(ctx, roster[start:end])
+	if err != nil {
+		return err
+	}
+	for _, p := range batch.Results {
+		split[p.Gender]++
+	}
+}
+```
+
 ## country_id
 
-`Genderize` and `Agify` accept `WithCountry` to scope a prediction to an ISO 3166-1 alpha-2 country. The value is echoed back uppercase on each prediction as `CountryID`.
+`Genderize` and `Agify` accept `WithCountry` to scope a prediction to an ISO 3166-1 alpha-2 country.
+The value is echoed back uppercase on each prediction as `CountryID`.
 
 ```go
 g, err := client.Genderize(ctx, "kim", demografix.WithCountry("US"))
 // g.CountryID == "US"
 
 batch, err := client.AgifyBatch(ctx, names, demografix.WithCountry("US"))
+```
+
+Scoping changes the prediction: `andrea` reads female with probability 0.99 in the United States and
+male with probability 0.79 in Italy.
+
+```go
+us, _ := client.Genderize(ctx, "andrea", demografix.WithCountry("US")) // us.Gender == "female"
+it, _ := client.Genderize(ctx, "andrea", demografix.WithCountry("IT")) // it.Gender == "male"
 ```
 
 The nationalize methods do not take `WithCountry`.
@@ -127,18 +165,20 @@ fmt.Println(res.Quota.Remaining)
 
 ## Errors
 
-Methods return `(T, error)`. Non-2xx responses map by status code to a typed error; transport failures map to `TransportError`. Discover a type with `errors.As`.
+Methods return `(T, error)`. Non-2xx responses map by status code to a typed error; transport
+failures map to `TransportError`. Discover a type with `errors.As`.
 
 | Type | Cause |
 |---|---|
 | `AuthError` | 401, invalid or rejected API key |
 | `SubscriptionError` | 402, inactive or expired subscription |
-| `ValidationError` | 422, or a batch over ten names (client-side, no HTTP call) |
+| `ValidationError` | 422, or a batch over 100 names (client-side, no HTTP call) |
 | `RateLimitError` | 429, quota exhausted |
 | `DemografixError` | base type for any other non-2xx response |
 | `TransportError` | network failure, timeout, or non-JSON body |
 
-Each type embeds `DemografixError`, which carries `Status`, `Message`, and `*Quota`. `errors.As` matches both the concrete type and the base.
+Each type embeds `DemografixError`, which carries `Status`, `Message`, and `*Quota`. `errors.As`
+matches both the concrete type and the base.
 
 A `TransportError` wraps the underlying cause in its `Err` field, so `errors.Is` reaches it:
 
@@ -164,17 +204,32 @@ if err != nil {
 
 ## Methods
 
-| Method | Returns |
-|---|---|
-| `Genderize(ctx, name, ...Option)` | `GenderizeResult` |
-| `GenderizeBatch(ctx, names, ...Option)` | `GenderizeBatchResult` |
-| `Agify(ctx, name, ...Option)` | `AgifyResult` |
-| `AgifyBatch(ctx, names, ...Option)` | `AgifyBatchResult` |
-| `Nationalize(ctx, name)` | `NationalizeResult` |
-| `NationalizeBatch(ctx, names)` | `NationalizeBatchResult` |
+| Method | Returns | country_id |
+|---|---|---|
+| `Genderize(ctx, name, ...RequestOption)` | `GenderizeResult` | yes |
+| `GenderizeBatch(ctx, names, ...RequestOption)` | `GenderizeBatchResult` | yes |
+| `Agify(ctx, name, ...RequestOption)` | `AgifyResult` | yes |
+| `AgifyBatch(ctx, names, ...RequestOption)` | `AgifyBatchResult` | yes |
+| `Nationalize(ctx, name)` | `NationalizeResult` | no |
+| `NationalizeBatch(ctx, names)` | `NationalizeBatchResult` | no |
 
-`Option` is `WithCountry("US")`, accepted by the genderize and agify methods only. A single result embeds its prediction fields and adds `Quota`. A batch result holds `Results` plus one `Quota`.
+There are two option types. `RequestOption` is a per-call option: the only one is
+`WithCountry("US")`, accepted by the genderize and agify methods. `Option` is a client option passed
+to `New`: the only one is `WithTimeout(d)`, which defaults to ten seconds. A single result embeds its
+prediction fields and adds `Quota`. A batch result holds `Results` plus one `Quota`.
 
 ## API keys
 
-An API key is required. Creating one is free and includes 2,500 requests per month. Generate a key in your dashboard at genderize.io, agify.io, or nationalize.io. One key works across all three services. Full reference: https://genderize.io/documentation/api
+An API key is required. Creating one is free and includes 2,500 names per month.
+
+Quota counts **names, not requests**. A single-name call costs 1. A batch of 100 names costs 100. The
+free tier therefore covers 2,500 names in a month however they are split across calls.
+
+Generate a key in your dashboard at [genderize.io](https://genderize.io),
+[agify.io](https://agify.io), or [nationalize.io](https://nationalize.io). One key works across all
+three services. Full reference:
+[genderize.io/documentation/api](https://genderize.io/documentation/api).
+
+## License
+
+MIT. See [LICENSE](LICENSE).

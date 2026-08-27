@@ -103,8 +103,8 @@ func TestGenderizeSingle(t *testing.T) {
 	if _, ok := q["name[]"]; ok {
 		t.Error("single request must not use name[]")
 	}
-	if got := req.Header.Get("User-Agent"); got != "demografix-go/0.2.0" {
-		t.Errorf("User-Agent = %q, want demografix-go/0.2.0", got)
+	if got := req.Header.Get("User-Agent"); got != "demografix-go/0.2.1" {
+		t.Errorf("User-Agent = %q, want demografix-go/0.2.1", got)
 	}
 	if req.URL.Host != "api.genderize.io" {
 		t.Errorf("host = %q, want api.genderize.io", req.URL.Host)

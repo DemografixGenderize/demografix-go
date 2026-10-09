@@ -21,7 +21,7 @@ import (
 
 const (
 	// Version is the SDK version, sent in the User-Agent on every request.
-	Version = "0.2.1"
+	Version = "0.2.2"
 
 	userAgent = "demografix-go/" + Version
 
